@@ -27,7 +27,14 @@
                     </div>
                     <div class="col-md-5">
                         <label for="board" class="form-label fw-bold">PTT 看板名稱</label>
-                        <input type="text" class="form-control" id="board" value="BeautySalon" required>
+                        <!-- 改為美妝保養類看板下拉選單 -->
+                        <select class="form-select" id="board" required>
+                            <option value="BeautySalon" selected>BeautySalon (美妝保養板)</option>
+                            <option value="MakeUp">MakeUp (彩妝板)</option>
+                            <option value="hairdo">hairdo (髮型與洗護髮板)</option>
+                            <option value="Health">Health (健康板)</option>
+                            <option value="regimen">regimen (養生之道板)</option>  
+                        </select>
                     </div>
                 </div>
                 <div class="mt-4 text-center">
@@ -131,10 +138,13 @@
                 }
 
             } catch (error) {
-                // 捕捉網路連線失敗或 500 錯誤
                 alertBox.className = 'alert alert-danger';
-                alertBox.innerText = '連線或處理失敗：' + error.message;
-                alertBox.classList.remove('d-none');
+                if (error.message.includes('503') || error.message.includes('UNAVAILABLE')) {
+                    alertBox.innerText = '⚠️ AI 分析服務目前流量較高 (503)，請等待約 10 秒後再次點擊查詢！';
+                } else {
+                    alertBox.innerText = '連線或處理失敗：' + error.message;
+                }
+    alertBox.classList.remove('d-none');                
             } finally {
                 // 4. 恢復按鈕狀態
                 submitBtn.disabled = false;

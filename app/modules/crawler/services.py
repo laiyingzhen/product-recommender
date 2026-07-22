@@ -3,6 +3,7 @@ import json
 import urllib.parse
 import requests
 import pandas as pd
+import time
 from bs4 import BeautifulSoup
 from typing import List, Tuple
 from google import genai
@@ -127,16 +128,33 @@ PTT 內容：
             temperature=0.2,
         )
 
-        response = client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=prompt,
-            config=config,
-        )
-
-        try:
-            return json.loads(response.text)
-        except json.JSONDecodeError:
-            return []
+        # 自動重試機制
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-3.5-flash",
+                    contents=prompt,
+                    config=config,
+                )
+                # 1. 成功取得回應後，嘗試解析 JSON
+                try:
+                    return json.loads(response.text)
+                except json.JSONDecodeError:
+                    print(f"⚠️ AI 回傳內容無法解析為 JSON: {response.text}")
+                    return [] # JSON 格式錯誤直接放棄，不需重試發送 API 請求
+            except Exception as e:
+                # 2. 捕捉 API 503 / 流量限制等伺服器端錯誤並進行重試
+                if "503" in str(e) or "UNAVAILABLE" in str(e):
+                    if attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 2
+                        print(f"⚠️ Gemini API 繁忙中 (503)，將於 {wait_time} 秒後進行第 {attempt + 2} 次重試...")
+                        time.sleep(wait_time)
+                        continue
+                
+                # 若非 503 或已達最後一次重試失敗，則將 Exception 向上拋給前端處理
+                raise e
+        return []
 
     @classmethod
     async def process_search(cls, keyword: str, board: str = "BeautySalon") -> Tuple[List[ProductResult], str]:
