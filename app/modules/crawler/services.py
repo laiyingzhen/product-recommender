@@ -46,35 +46,35 @@ class PttService:
     @classmethod
     def extract_article_content(cls, article_url: str) -> str:
         """解析單一 PTT 文章網頁，取出標題、內文與推文文字"""
-        response = requests.get(article_url, headers=cls.HEADERS, timeout=10)
-        if response.status_code != 200:
+        try:
+            response = requests.get(article_url, headers=cls.HEADERS, timeout=10)
+            if response.status_code != 200:
+                return ""
+
+            soup = BeautifulSoup(response.text, "html.parser")
+            main_content = soup.find("div", id="main-content")
+
+            if not main_content:
+                return ""
+
+            # 抓取推文
+            push_texts = []
+            for push in main_content.find_all("div", class_="push"):
+                push_content = push.find("span", class_="push-content")
+                if push_content:
+                    push_texts.append(push_content.text.strip(": "))
+                push.extract()
+
+            # 清理元資料
+            for meta in main_content.find_all("div", class_=lambda c: c and "article-metaline" in c):
+                meta.extract()
+
+            content_text = main_content.text.strip()
+            return f"【文章內容】:\n{content_text}\n\n【推文/回文列表】:\n" + "\n".join(push_texts)
+
+        except Exception as e:
+            print(f"抓取單篇文章失敗 ({article_url}): {e}")
             return ""
-
-        soup = BeautifulSoup(response.text, "html.parser")
-        main_content = soup.find("id", "main-content") or soup.find("div", id="main-content")
-
-        if not main_content:
-            return ""
-
-        # 抓取推文
-        push_texts = []
-        for push in main_content.find_all("div", class_="push"):
-            push_content = push.find("span", class_="push-content")
-            if push_content:
-                push_texts.append(push_content.text.strip(": "))
-            push.extract()  # 從主文剔除推文 DOM，方便分離內文
-
-        # 抓取內文 (排除看板資訊與 meta metadata)
-        for meta in main_content.find_all("div", class_="article-metaline"):
-            meta.extract()
-        for meta in main_content.find_all("div", class_="article-metaline-right"):
-            meta.extract()
-
-        content_text = main_content.text.strip()
-
-        # 組成乾淨的文本結構供 AI 分析
-        formatted_text = f"【文章內容】:\n{content_text}\n\n【推文/回文列表】:\n" + "\n".join(push_texts)
-        return formatted_text
 
     @classmethod
     def parse_products_with_gemini(cls, combined_text: str) -> List[dict]:
@@ -106,7 +106,7 @@ PTT 內容：
         )
 
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-3.5-flash",
             contents=prompt,
             config=config,
         )
