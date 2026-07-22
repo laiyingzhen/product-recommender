@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PTT 商品推薦分析系統</title>
+    <!-- 使用 Bootstrap 5 快速建立乾淨簡潔的 UI -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .container { max-width: 900px; margin-top: 50px; }
+        .card { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .spinner-border { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container mb-5">
+        <h2 class="text-center fw-bold mb-4">💬 PTT 商品聲量分析系統</h2>
+
+        <!-- 搜尋表單卡片 -->
+        <div class="card p-4 mb-4">
+            <form id="searchForm">
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label for="keyword" class="form-label fw-bold">查詢產品關鍵字</label>
+                        <input type="text" class="form-control" id="keyword" placeholder="例如：除疤凝膠、抗痘" required>
+                    </div>
+                    <div class="col-md-5">
+                        <label for="board" class="form-label fw-bold">PTT 看板名稱</label>
+                        <input type="text" class="form-control" id="board" value="BeautySalon" required>
+                    </div>
+                </div>
+                <div class="mt-4 text-center">
+                    <button type="submit" class="btn btn-primary btn-lg px-5" id="submitBtn">
+                        <span class="spinner-border spinner-border-sm me-2" id="loadingSpinner" role="status"></span>
+                        <span id="btnText">開始爬取與 AI 分析</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 訊息與提示區塊 -->
+        <div id="alertBox" class="alert alert-danger d-none" role="alert"></div>
+
+        <!-- 分析結果表格卡片 -->
+        <div class="card p-4 d-none" id="resultCard">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-bold m-0">📊 分析結果</h4>
+                <span class="badge bg-success fs-6" id="csvTip">CSV 已同步匯出</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">產品名稱</th>
+                            <th scope="col" class="text-center">文章內文提及數</th>
+                            <th scope="col" class="text-center">推文提及數</th>
+                            <th scope="col" class="text-center">次數總計</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultTableBody">
+                        <!-- 動態由 JavaScript 填入 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 邏輯 -->
+    <script>
+        document.getElementById('searchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const keyword = document.getElementById('keyword').value.trim();
+            const board = document.getElementById('board').value.trim();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const btnText = document.getElementById('btnText');
+            const resultCard = document.getElementById('resultCard');
+            const alertBox = document.getElementById('alertBox');
+            const tableBody = document.getElementById('resultTableBody');
+
+            // 1. 切換至載入狀態
+            submitBtn.disabled = true;
+            loadingSpinner.style.display = 'inline-block';
+            btnText.innerText = '分析中（約需 10-15 秒）...';
+            
+            // 清空並隱藏舊訊息與結果
+            alertBox.classList.add('d-none');
+            alertBox.className = 'alert alert-danger d-none'; // 恢復預設紅色警告框
+            resultCard.classList.add('d-none');
+
+            try {
+                // 2. 呼叫 FastAPI 後端 API
+                const response = await fetch('/api/v1/crawler/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyword: keyword, board: board })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || '伺服器回應異常，請稍後再試');
+                }
+
+                // 3. 判斷是否有資料
+                tableBody.innerHTML = '';
+                if (data.results && data.results.length > 0) {
+                    // 有資料：繪製表格
+                    data.results.forEach((item, index) => {
+                        const row = `
+                            <tr>
+                                <th scope="row">${index + 1}</th>
+                                <td class="fw-bold">${item.product_name}</td>
+                                <td class="text-center">${item.content_count}</td>
+                                <td class="text-center">${item.comment_count}</td>
+                                <td class="text-center fw-bold text-primary">${item.total_count}</td>
+                            </tr>
+                        `;
+                        tableBody.insertAdjacentHTML('beforeend', row);
+                    });
+                    resultCard.classList.remove('d-none');
+                } else {
+                    // 無資料：優雅地提示使用者 (改用黃色警告框)
+                    alertBox.className = 'alert alert-warning';
+                    alertBox.innerText = `🔍 在 PTT ${board} 板找不到與「${keyword}」相關的文章，請嘗試更簡短的關鍵字（如：洗髮精）。`;
+                    alertBox.classList.remove('d-none');
+                }
+
+            } catch (error) {
+                // 捕捉網路連線失敗或 500 錯誤
+                alertBox.className = 'alert alert-danger';
+                alertBox.innerText = '連線或處理失敗：' + error.message;
+                alertBox.classList.remove('d-none');
+            } finally {
+                // 4. 恢復按鈕狀態
+                submitBtn.disabled = false;
+                loadingSpinner.style.display = 'none';
+                btnText.innerText = '開始爬取與 AI 分析';
+            }
+        });
+    </script>
+</body>
+</html>

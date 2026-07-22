@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -9,16 +10,18 @@ app = FastAPI(
     version=settings.VERSION
 )
 
-# 1. 掛載靜態檔案 (CSS/JS)
-#app.mount("/static", StaticFiles(directory="static"), name="static")
+# 自動建立 static 資料夾（防範目錄不存在的報錯）
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 2. 設定 HTML Template 引擎
+# 設定 HTML Template 引擎
 templates = Jinja2Templates(directory="app/templates")
 
-# 3. 註冊模組化的 Routers (未來新增模組就在這 include)
+# 註冊 API 路由
 app.include_router(crawler_router)
 
-# 4. 前端首頁路由
+# 1. 系統首頁路由
 @app.get("/")
 async def home_page(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "title": settings.PROJECT_NAME})
+    # 新版語法：第一個參數傳入 request，第二個參數 context 傳入其他變數 (若無可傳空字典 {})
+    return templates.TemplateResponse(request, "index.html", context={})

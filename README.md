@@ -7,7 +7,8 @@
 ## 伺服器啟動指令：
 ### uvicorn app.main:app --reload
 ## 啟動方式：
-### 開啟瀏覽器訪問：http://127.0.0.1:8000/docs
+### Swagger後端測試：http://127.0.0.1:8000/docs
+### 網站首頁：http://127.0.0.1:8000
 ### 點開 POST /api/v1/crawler/search 點擊 Try it out，輸入
 
 ``` js

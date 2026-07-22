@@ -141,11 +141,11 @@ PTT 內容：
     @classmethod
     async def process_search(cls, keyword: str, board: str = "BeautySalon") -> Tuple[List[ProductResult], str]:
         """整合流程：爬蟲 -> AI 解析 -> 資料加總 -> 儲存 CSV"""
-        # 1. 抓取文章 URL (預設抓最新 5 篇做分析)
+        # 新寫法：找不到文章時，印出 Log 並直接回傳空的結果 list 與空路徑，狀態碼保持 200 OK
         urls = cls.fetch_ptt_article_urls(keyword, board, max_articles=5)
-
         if not urls:
-            raise Exception(f"在 PTT {board} 板找不到與 '{keyword}' 相關的文章")
+            print(f"⚠️ 在 PTT {board} 板找不到與 '{keyword}' 相關的文章")
+            return [], ""
 
         # 2. 爬取並合併多篇文章內容
         all_text_blocks = []
