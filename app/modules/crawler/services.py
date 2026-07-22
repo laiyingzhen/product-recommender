@@ -45,7 +45,7 @@ class PttService:
 
     @classmethod
     def extract_article_content(cls, article_url: str) -> str:
-        """解析單一 PTT 文章網頁，取出標題、內文與推文文字"""
+        """解析單一 PTT 文章網頁，精準切分【文章內文】與【推文列表】"""
         try:
             response = requests.get(article_url, headers=cls.HEADERS, timeout=10)
             if response.status_code != 200:
@@ -57,23 +57,38 @@ class PttService:
             if not main_content:
                 return ""
 
-            # 抓取推文
+            # 1. 先把所有推文(push)抽出來，獨立組成推文文字區塊
             push_texts = []
             for push in main_content.find_all("div", class_="push"):
                 push_content = push.find("span", class_="push-content")
                 if push_content:
                     push_texts.append(push_content.text.strip(": "))
-                push.extract()
+                push.extract() # 徹底將推文從 DOM 樹移除，剩下的就是原作者的內文！
 
-            # 清理元資料
-            for meta in main_content.find_all("div", class_=lambda c: c and "article-metaline" in c):
+            # 2. 移除作者資訊列、看板資訊、Signature/發信站等元資料
+            for meta in main_content.find_all("div", class_=["article-metaline", "article-metaline-right"]):
                 meta.extract()
+            
+            # 移除常見的發信站、看板簽名檔等 (通常以 f2 開頭的 span)
+            for f2 in main_content.find_all("span", class_="f2"):
+                f2.extract()
 
-            content_text = main_content.text.strip()
-            return f"【文章內容】:\n{content_text}\n\n【推文/回文列表】:\n" + "\n".join(push_texts)
+            # 3. 取得乾淨的【文章內文】
+            article_body = main_content.text.strip()
+
+            # 4. 格式化為結構明確的文本
+            formatted_text = (
+                f"=== [文章內文開始] ===\n"
+                f"{article_body}\n"
+                f"=== [文章內文結束] ===\n\n"
+                f"=== [推文與回文開始] ===\n"
+                + "\n".join(push_texts) + "\n"
+                f"=== [推文與回文結束] ==="
+            )
+            return formatted_text
 
         except Exception as e:
-            print(f"抓取單篇文章失敗 ({article_url}): {e}")
+            print(f"抓取文章失敗 ({article_url}): {e}")
             return ""
 
     @classmethod
@@ -87,13 +102,20 @@ class PttService:
         client = genai.Client(api_key=api_key)
 
         prompt = f"""
-你是一個精準的文字分析專家。請閱讀以下來自 PTT 看板的文章與推文，幫我找出所有被提及的「保養品/藥膏/產品名稱」。
+你是一個精準的 PTT 文章文字分析專家。請閱讀以下 PTT 文章與推文，找出所有提及的「除疤/保養品/藥膏/產品名稱」。
 
-分析規則：
-1. 請包含產品全名、品牌名稱或常見俗稱（例如：玻麗舒、倍舒痕、海洋拉娜、小棕瓶）。
-2. 請精準統計該產品在「文章內文」與「推文」中出現的次數。
-3. 排除一般性詞彙（例如：醫生、皮膚科、效果、藥局、診所）。
-4. 請以 JSON 陣列格式輸出。
+嚴格計算規則：
+1. 文本已明確標示為 `=== [文章內文開始] === ... === [文章內文結束] ===` 以及 `=== [推文與回文開始] === ... === [推文與回文結束] ===`。
+2. 請分別計算產品在「文章內文」出現的次數 (`content_count`) 與「推文與回文」出現的次數 (`comment_count`)。
+3. 如果文章內文有提到該產品，`content_count` 絕對不能為 0！
+4. 請幫我合併同義詞與品牌俗稱（例如：玻麗舒/波麗舒、飛宜德/fayd）。
+5. 排除非產品的詞彙（例如：皮膚科、醫生、淡斑、效果）。
+
+請以 JSON 陣列格式回傳：
+[
+  {{"product_name": "玻麗舒", "content_count": 1, "comment_count": 16}},
+  {{"product_name": "倍舒痕", "content_count": 0, "comment_count": 4}}
+]
 
 PTT 內容：
 {combined_text}
