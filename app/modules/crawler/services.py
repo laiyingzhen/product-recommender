@@ -120,13 +120,14 @@ class PttService:
 
 PTT 內容：
 {combined_text}
+【注意】請只擷取討論度最高的前5個產品即可，並務必輸出完整的 JSON 陣列格式。
 """
 
         # 設定以強制 JSON 格式輸出 (Structured Output)
         config = types.GenerateContentConfig(
             response_mime_type="application/json",
-            temperature=0.2,
-        )
+            temperature=0.0,  # 極速推論模式
+         )
 
         # 自動重試機制
         max_retries = 3
