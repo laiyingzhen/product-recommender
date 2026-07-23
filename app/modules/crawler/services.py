@@ -159,7 +159,8 @@ PTT 內容：
     @classmethod
     async def process_search(cls, keyword: str, board: str = "BeautySalon") -> Tuple[List[ProductResult], str]:
         """整合流程：爬蟲 -> AI 解析 -> 資料加總 -> 儲存 CSV"""
-        # 新寫法：找不到文章時，印出 Log 並直接回傳空的結果 list 與空路徑，狀態碼保持 200 OK
+        # 找不到文章時，印出 Log 並直接回傳空的結果 list 與空路徑，狀態碼保持 200 OK
+        start_crawler = time.perf_counter()
         urls = cls.fetch_ptt_article_urls(keyword, board, max_articles=5)
         if not urls:
             print(f"⚠️ 在 PTT {board} 板找不到與 '{keyword}' 相關的文章")
@@ -174,8 +175,15 @@ PTT 內容：
 
         full_corpus = "\n\n=====================\n\n".join(all_text_blocks)
 
-        # 3. 送交 Gemini AI 解析
+        crawler_duration = time.perf_counter() - start_crawler
+        print(f"⏱️ [Log] 1. PTT 爬蟲抓取完成 (含 {len(urls)} 篇文章)，耗時: {crawler_duration:.2f} 秒")
+
+        start_ai = time.perf_counter()
+        # 3. 送交 Gemini AI 解析        
         ai_raw_results = cls.parse_products_with_gemini(full_corpus)
+        ai_duration = time.perf_counter() - start_ai
+        print(f"⏱️ [Log] 2. Gemini AI 解析完成，耗時: {ai_duration:.2f} 秒")
+
 
         # 4. 使用 Pandas 進行多筆產品數據加總整理
         if not ai_raw_results:
@@ -210,8 +218,12 @@ PTT 內容：
         ]
 
         # 6. 存成 CSV 檔
+        # ⏱️ 記錄 產出CSV時間
+        start_csv = time.perf_counter()
         os.makedirs("data", exist_ok=True)
         csv_path = f"data/{keyword}_result.csv"
         df_grouped.to_csv(csv_path, index=False, encoding="utf-8-sig")
+        csv_duration = time.perf_counter() - start_csv
+        print(f"⏱️ [Log] 3. CSV 檔案產出完成，耗時: {csv_duration:.2f} 秒")
 
         return final_results, csv_path
