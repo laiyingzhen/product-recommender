@@ -26,7 +26,7 @@ class PttService:
         """向 PTT 板塊發送搜尋請求，取得前 N 篇相關文章的網址"""
         encoded_keyword = urllib.parse.quote(keyword)
         search_url = f"{cls.PTT_DOMAIN}/bbs/{board}/search?q={encoded_keyword}"
-
+        print("向PTT發送搜尋請求，取得文章網址...")
         response = requests.get(search_url, headers=cls.HEADERS, timeout=10)
         if response.status_code != 200:
             raise Exception(f"無法存取 PTT 搜尋頁面 (Status: {response.status_code})")
@@ -50,8 +50,9 @@ class PttService:
         try:
             response = requests.get(article_url, headers=cls.HEADERS, timeout=10)
             if response.status_code != 200:
+                print(f"⚠️ 無法存取文章頁面: {article_url}")
                 return ""
-
+            print(f"成功抓取文章內容: {article_url}，開始解析內文與推文...")
             soup = BeautifulSoup(response.text, "html.parser")
             main_content = soup.find("div", id="main-content")
 
@@ -161,12 +162,14 @@ PTT 內容：
     async def process_search(cls, keyword: str, board: str = "BeautySalon") -> Tuple[List[ProductResult], str]:
         """整合流程：爬蟲 -> AI 解析 -> 資料加總 -> 儲存 CSV"""
         # 找不到文章時，印出 Log 並直接回傳空的結果 list 與空路徑，狀態碼保持 200 OK
+        print("開始處理 PTT 搜尋任務...")
         start_crawler = time.perf_counter()
         urls = cls.fetch_ptt_article_urls(keyword, board, max_articles=5)
         if not urls:
             print(f"⚠️ 在 PTT {board} 板找不到與 '{keyword}' 相關的文章")
             return [], ""
 
+        print("取得url成功，開始抓取文章內容...")
         # 2. 爬取並合併多篇文章內容
         all_text_blocks = []
         for url in urls:
@@ -179,6 +182,7 @@ PTT 內容：
         crawler_duration = time.perf_counter() - start_crawler
         print(f"⏱️ [Log] 1. PTT 爬蟲抓取完成 (含 {len(urls)} 篇文章)，耗時: {crawler_duration:.2f} 秒")
 
+        print("開始處理 Gemini AI 解析...")
         start_ai = time.perf_counter()
         # 3. 送交 Gemini AI 解析        
         ai_raw_results = cls.parse_products_with_gemini(full_corpus)
@@ -219,6 +223,7 @@ PTT 內容：
         ]
 
         # 6. 存成 CSV 檔
+        print("開始產出 CSV 檔案...")
         # ⏱️ 記錄 產出CSV時間
         start_csv = time.perf_counter()
         os.makedirs("data", exist_ok=True)
