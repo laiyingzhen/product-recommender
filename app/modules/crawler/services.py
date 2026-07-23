@@ -27,7 +27,11 @@ class PttService:
         encoded_keyword = urllib.parse.quote(keyword)
         search_url = f"{cls.PTT_DOMAIN}/bbs/{board}/search?q={encoded_keyword}"
         print("向PTT發送搜尋請求，取得文章網址...")
-        response = requests.get(search_url, headers=cls.HEADERS, timeout=10)
+        try:
+            response = requests.get(search_url, headers=cls.HEADERS, timeout=10)
+        except Exception as e:
+            print(f"❌ 無法連線到 PTT 搜尋頁面: {e}")
+            return []
         if response.status_code != 200:
             raise Exception(f"無法存取 PTT 搜尋頁面 (Status: {response.status_code})")
 

@@ -141,6 +141,8 @@
                 alertBox.className = 'alert alert-danger';
                 if (error.message.includes('503') || error.message.includes('UNAVAILABLE')) {
                     alertBox.innerText = '⚠️ AI 分析服務目前流量較高 (503)，請等待約 10 秒後再次點擊查詢！';
+                } else if (error.message.includes('429') || error.message.includes('RESOURCE_EXHAUSTED')) {  
+                    alertBox.innerText = '⏳ 已達到 API 額度上限或請求過於頻繁，請稍後再試。';  
                 } else {
                     alertBox.innerText = '連線或處理失敗：' + error.message;
                 }

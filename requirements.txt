@@ -1,0 +1,17 @@
+# Web 框架與前端模板
+fastapi>=0.139.2
+uvicorn>=0.51.0
+pydantic>=2.13.4
+Jinja2>=3.1.6
+
+# Google AI
+google-genai>=2.13.0
+
+# 異步爬蟲與 HTML 解析
+httpx>=0.28.1
+requests>=2.34.2
+beautifulsoup4>=4.15.0
+
+# 資料處理與環境變數
+pandas>=3.0.3
+python-dotenv>=1.2.2
